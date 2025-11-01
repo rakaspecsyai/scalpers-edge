@@ -1,3 +1,5 @@
+ import React from "react";
+ 
  const CustomIndicatorTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
