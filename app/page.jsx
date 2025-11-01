@@ -1,12 +1,13 @@
 "use client";
-import { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, ComposedChart } from 'recharts';
-import { Loader2, Brain, Clock, Coins } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, ComposedChart, ReferenceArea } from 'recharts';
+import { Loader2, Brain, Clock, Coins, Bell, BellOff } from 'lucide-react';
 import ControlCard from './components/ControlCard';
 import SignalCard from './components/SignalCard';
 import PerformanceCard from './components/PerformanceCard';
 import calculateRSI from './components/indicators/calculateRSI';
 import calculateStochastic from './components/indicators/calculateStochastic';
+import calculateFVG from './components/indicators/calculateFVG';
 import CustomIndicatorTooltip from './components/CustomIndicatorTooltip';
 import formatTooltipPrice from './components/formatToolTipPrice';
 import formatTooltipTime from './components/formatToolTipTime'; 
@@ -22,12 +23,56 @@ import formatTooltipTime from './components/formatToolTipTime';
 export default function Home() {
   const [coinPair, setCoinPair] = useState('ethereum'); // bitcoin, ethereum, solana, ripple, bnb
   const [indicator, setIndicator] = useState('rsi'); // rsi, stochastic, all
-  const [timeframe, setTimeframe] = useState('5m'); // 5m, 15m, 1h, 1d setting timeframe
+  const [timeframe, setTimeframe] = useState('5m'); // 5m, 15m, 1h, 4h, 1d setting timeframe
   const [chartData, setChartData] = useState([]);
   const [signal, setSignal] = useState('NEUTRAL');
   const [performance, setPerformance] = useState({ winRate: 0, plRatio: 0, trades: 0, avgGain: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+
+
+  // state baru untuk audio
+  const [isMuted, setIsMuted] = useState(true);
+  const audioCtxRef = useRef(null); // Nyimpen audiocontext
+
+  // Fungsi audio beep
+  const playBeep = (type = 'long') => {
+    // Hanya mainkan jika AudioContext sudah diinisialisasi oleh user
+    if (!audioCtxRef.current) return;
+
+    try {
+      //durasi dan gap setting
+      const beepDuration = 0.2; // durasi tiap beep dalam detik
+      const gapDuration = 0.2; // jeda antar beep dalam detik
+      const numberOfBeeps = 3; // jumlah beep
+
+      const frequency = type === 'long' ? 432 : 528; // Frekuensi dasar
+
+      //memainkan beep sesuai jumlah
+      for (let i = 0; i < numberOfBeeps; i++) {
+        // const startTime = audioCtxRef.current.currentTime + i * (beepDuration + gapDuration);
+
+        const oscillator = audioCtxRef.current.createOscillator();
+        const gainNode = audioCtxRef.current.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtxRef.current.destination);
+
+        oscillator.type = 'square';
+        oscillator.frequency.value = frequency;
+        gainNode.gain.setValueAtTime(0.1, audioCtxRef.current.currentTime); // volume
+
+        // Menghitung waktu mulai untuk setiap beep
+        const startTime = audioCtxRef.current.currentTime + i * (beepDuration + gapDuration);
+        const endTime = startTime + beepDuration;
+
+        oscillator.start(startTime);
+        oscillator.stop(startTime + beepDuration);
+      }
+    } catch (e) {
+      console.error("Error playing beep:", e);
+    }
+  };
 
   // --- Fungsi Kalkulasi Indikator ---
 
@@ -75,14 +120,20 @@ const runStrategy = async (currentCoin = coinPair,
         high: parseFloat(d[2]),
         low: parseFloat(d[3]),
         close: parseFloat(d[4]),
+        volume: parseFloat(d[5]),
         price: parseFloat(d[4]), // 'price' untuk chart utama
         // inisialisasi nilai indikator
         rsi: null,
         stochK: null,
         stochD: null,
+        fvgbull: null,
+        fvgbear: null,
       }));
 
       // 3. Kalkulasi Indikator
+      //hitung fvg karena tidak bergantung pada pilihan indikator
+      formattedData = calculateFVG(formattedData);
+
       if (currentIndicator === 'rsi' || currentIndicator === 'all') {
         formattedData = calculateRSI(formattedData);
       }
@@ -94,6 +145,9 @@ const runStrategy = async (currentCoin = coinPair,
 
       // 4. Ambil data terbaru untuk sinyal
       const latestData = formattedData[formattedData.length - 1];
+      //cek candle N-2 untuk strategi FVG
+      const recentData = formattedData[formattedData.length - 2]; // data candle sebelumnya
+
       if (!latestData) {
         setSignal('NEUTRAL');
         setIsLoading(false);
@@ -103,6 +157,10 @@ const runStrategy = async (currentCoin = coinPair,
       // 5. Logika Sinyal (Berdasarkan Indikator)
       let currentSignal = 'NEUTRAL';
       switch (currentIndicator) {
+        case 'fvg':
+          if (recentData.fvgBull) currentSignal = 'LONG';
+          else if (recentData.fvgBear) currentSignal = 'SHORT';
+          break;
         case 'rsi':
           if (latestData.rsi < 30) currentSignal = 'LONG';
           else if (latestData.rsi > 70) currentSignal = 'SHORT';
@@ -114,14 +172,26 @@ const runStrategy = async (currentCoin = coinPair,
         case 'all':
           const rsiSignal = latestData.rsi < 30 ? 'LONG' : (latestData.rsi > 70 ? 'SHORT' : 'NEUTRAL');
           const stochSignal = (latestData.stochK < 20 && latestData.stochD < 20) ? 'LONG' : ((latestData.stochK > 80 && latestData.stochD > 80) ? 'SHORT' : 'NEUTRAL');
-          
-          if (rsiSignal === 'LONG' && stochSignal === 'LONG') currentSignal = 'LONG';
-          else if (rsiSignal === 'SHORT' && stochSignal === 'SHORT') currentSignal = 'SHORT';
+          const fvgSignal = recentData.fvgBull ? 'LONG' : (recentData.fvgBear ? 'SHORT' : 'NEUTRAL');
+          if (rsiSignal === 'LONG' && stochSignal === 'LONG' && fvgSignal === 'LONG') currentSignal = 'LONG';
+          else if (rsiSignal === 'SHORT' && stochSignal === 'SHORT' && fvgSignal === 'SHORT') currentSignal = 'SHORT';
           else currentSignal = 'NEUTRAL';
           break;
         default:
           currentSignal = 'NEUTRAL';
       }
+
+      // Mainkan suara berdasarkan sinyal baru
+      // Cek if: sinyal berubah dan tidak mute
+      if (!isMuted && currentSignal !== 'NEUTRAL' && currentSignal !== signal) {
+        if (currentSignal === 'LONG') {
+          playBeep('long');
+        } else if (currentSignal === 'SHORT') {
+          playBeep('short');
+        }
+      }
+      // ------------------
+
       setSignal(currentSignal);
 
       // 6. Mockup Performance (Data Palsu)
@@ -160,13 +230,69 @@ const runStrategy = async (currentCoin = coinPair,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coinPair, indicator, timeframe]); // Dependensi: jalankan ulang jika koin atau indikator berubah serta timeframe
 
+  // ---- HANDLER TOMBOL MUTE UNTUK AUDIO ----
+  const toggleMute = () => {
+    // Inisialisasi AudioContext pada interaksi user pertama kali
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    //Jika audio context dalam keadaan suspended, resume
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+
+    setIsMuted(!isMuted);
+  }
+
+
+
   // --- Helper untuk Format Chart ---
   const formatXAxis = (tickItem) => {
     return new Date(tickItem).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Custom Tooltip untuk Chart Indikator
- 
+  // Custom Tooltip untuk Chart Indikator (ada di CustomIndicatorTooltip.jsx)
+  //FVGAreas chart component
+  const fvgAreas = useMemo(() => {
+    return chartData
+      .map((d, i) => {
+        // d adalah midCandle. Kita butuh waktu mulai candle BERIKUTNYA untuk 'x2'
+        const nextTime = chartData[i + 1]?.time;
+        if (!nextTime) return null; // Jangan gambar di candle terakhir
+
+        // Gambar Bullish FVG (hijau transparan)
+        if (d.fvgBull) {
+          return (
+            <ReferenceArea
+              key={`fvgB_${d.time}`}
+              x1={d.time}
+              x2={nextTime}
+              y1={d.fvgBull.bottom}
+              y2={d.fvgBull.top}
+              stroke="none"
+              fill="rgba(0, 255, 0, 0.2)"
+            />
+          );
+        }
+        // Gambar Bearish FVG (merah transparan)
+        if (d.fvgBear) {
+          return (
+            <ReferenceArea
+              key={`fvgS_${d.time}`}
+              x1={d.time}
+              x2={nextTime}
+              y1={d.fvgBear.bottom}
+              y2={d.fvgBear.top}
+              stroke="none"
+              fill="rgba(255, 0, 0, 0.2)"
+            />
+          );
+        }
+        return null;
+      })
+      .filter(Boolean); // Hapus semua null
+  }, [chartData]); // Kalkulasi ulang hanya jika chartData berubah
   // --- Render JSX ---
 
   return (
@@ -191,6 +317,16 @@ const runStrategy = async (currentCoin = coinPair,
                 <span>Last Updated: {lastUpdated}</span>
               </>
             )}
+
+            {/* ---- TOMBOL MUTE/UNMUTE BARU ---- */}
+            <button
+              onClick={toggleMute}
+              className="text-gray-400 hover:text-white"
+              title={isMuted ? "Unmute Alerts" : "Mute Alerts"}
+            >
+              {isMuted ? <BellOff className="w-5 h-5" /> : <Bell className="w-5 h-5 text-indigo-400" />}
+            </button>
+            {/* ---------------------------------- */}
           </div>
         </header>
 
@@ -240,6 +376,7 @@ const runStrategy = async (currentCoin = coinPair,
                     <option value="5m">5m</option>
                     <option value="15m">15m</option>
                     <option value="1h">1h</option>
+                    <option value="4h">4h</option>
                     <option value="1d">1d</option>
                   </select>
                 </div>
@@ -258,6 +395,7 @@ const runStrategy = async (currentCoin = coinPair,
                   >
                     <option value="rsi">RSI</option>
                     <option value="stochastic">Stochastic</option>
+                    <option value="fvg">FVG</option>
                     <option value="all">Combination (All)</option>
                   </select>
                 </div>
@@ -326,6 +464,10 @@ const runStrategy = async (currentCoin = coinPair,
                     tickFormatter={(val) => `$${val.toLocaleString()}`}
                   />
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+
+                  {/* {fvgAreas} */}
+                  {fvgAreas}
+
                   <Area 
                     type="monotone" 
                     dataKey="price" 
