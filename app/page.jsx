@@ -1,438 +1,525 @@
-'use client';
+"use client";
+import { useState, useEffect, useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, ComposedChart } from 'recharts';
+import { TrendingUp, TrendingDown, Minus, Loader2, Brain, Check, BarChart2, Zap, Clock, Coins, Network } from 'lucide-react';
 
-import { useState, useEffect } from 'react';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart
-} from 'recharts';
-import {
-  Activity, BarChart2, ChevronDown, Cpu, Zap, TrendingUp, TrendingDown, Minus, Clock
-} from 'lucide-react';
+// --- Komponen UI ---
 
-// --- Komponen Helper untuk UI ---
-
-const SelectDropdown = ({ label, value, onChange, options, icon: Icon, disabled = false }) => (
-  <div className="mb-4">
-    <label className="flex items-center text-sm font-medium text-cyan-300 mb-1">
-      <Icon className="w-4 h-4 mr-2" />
-      {label}
-    </label>
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className={`w-full bg-gray-900/50 border border-gray-700 rounded-md px-3 py-2 text-white appearance-none focus:outline-none focus:border-cyan-500 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-      <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" />
-    </div>
-  </div>
+// Kartu untuk Dropdown Kontrol
+const ControlCard = ({ children }) => (
+  <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 shadow-lg">{children}</div>
 );
 
-const PerformancePanel = ({ performance }) => (
-  <div className="bg-gray-800/60 backdrop-blur-sm border border-gray-700/50 rounded-lg p-4">
-    <h3 className="text-lg font-semibold text-white mb-3">Backtest Performance (Mocked)</h3>
-    <div className="grid grid-cols-2 gap-3 text-sm">
-      <div>
-        <div className="text-gray-400">Win Rate</div>
-        <div className={`text-xl font-bold ${performance.winRate > 50 ? 'text-green-400' : 'text-red-400'}`}>
-          {performance.winRate.toFixed(2)}%
-        </div>
-      </div>
-      <div>
-        <div className="text-gray-400">Total Trades</div>
-        <div className="text-xl font-bold text-white">{performance.trades}</div>
-      </div>
-      <div>
-        <div className="text-gray-400">Profit/Loss</div>
-        <div className={`text-xl font-bold ${performance.pnl > 0 ? 'text-green-400' : 'text-red-400'}`}>
-          {performance.pnl.toFixed(2)}%
-        </div>
-      </div>
-      <div>
-        <div className="text-gray-400">Sharpe Ratio</div>
-        <div className="text-xl font-bold text-white">{performance.sharpe.toFixed(2)}</div>
-      </div>
-    </div>
-  </div>
-);
-
-const SignalPanel = ({ signal }) => {
-  const getSignalUI = () => {
-    switch (signal.side) {
-      case 'LONG':
-        return {
-          Icon: TrendingUp,
-          color: 'text-green-400',
-          bgColor: 'bg-green-500/10',
-          borderColor: 'border-green-500/50'
-        };
-      case 'SHORT':
-        return {
-          Icon: TrendingDown,
-          color: 'text-red-400',
-          bgColor: 'bg-red-500/10',
-          borderColor: 'border-red-500/50'
-        };
-      default:
-        return {
-          Icon: Minus,
-          color: 'text-yellow-400',
-          bgColor: 'bg-yellow-500/10',
-          borderColor: 'border-yellow-500/50'
-        };
-    }
+// Kartu untuk Menampilkan Sinyal
+const SignalCard = ({ signal, timeframe }) => {
+  const signalConfig = {
+    LONG: { icon: TrendingUp, color: 'text-green-500', bgColor: 'bg-green-900' },
+    SHORT: { icon: TrendingDown, color: 'text-red-500', bgColor: 'bg-red-900' },
+    NEUTRAL: { icon: Minus, color: 'text-yellow-500', bgColor: 'bg-yellow-900' },
   };
-
-  const { Icon, color, bgColor, borderColor } = getSignalUI();
+  const { icon: Icon, color, bgColor } = signalConfig[signal] || signalConfig.NEUTRAL;
 
   return (
-    <div className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
-      <div className="flex items-center">
-        <Icon className={`w-8 h-8 mr-3 ${color}`} />
-        <div>
-          <div className={`text-2xl font-bold ${color}`}>{signal.side}</div>
-          <p className="text-gray-300 text-sm">{signal.message}</p>
-        </div>
+    <div className={`rounded-lg p-6 shadow-xl ${bgColor} border border-gray-700`}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-200">Signal ({timeframe})</h3>
+        <Icon className={`w-6 h-6 ${color}`} />
       </div>
+      <div className={`text-5xl font-bold ${color} text-center animate-pulse`}>
+        {signal}
+      </div>
+      <p className="text-center text-gray-400 mt-2">Based on selected indicator(s)</p>
     </div>
   );
 };
 
+// Kartu untuk Menampilkan Performa (Mockup)
+const PerformanceCard = ({ performance }) => (
+  <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 shadow-lg">
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="text-lg font-semibold text-gray-200">Backtest Performance (Mock)</h3>
+      <BarChart2 className="w-6 h-6 text-indigo-400" />
+    </div>
+    <div className="grid grid-cols-2 gap-4 text-center">
+      <div>
+        <p className="text-sm text-gray-400">Win Rate</p>
+        <p className="text-2xl font-semibold text-green-500">{performance.winRate}%</p>
+      </div>
+      <div>
+        <p className="text-sm text-gray-400">P/L Ratio</p>
+        <p className="text-2xl font-semibold text-gray-200">{performance.plRatio}</p>
+      </div>
+      <div>
+        <p className="text-sm text-gray-400">Trades</p>
+        <p className="text-2xl font-semibold text-gray-200">{performance.trades}</p>
+      </div>
+      <div>
+        <p className="text-sm text-gray-400">Avg. Gain</p>
+        <p className="text-2xl font-semibold text-green-500">{performance.avgGain}%</p>
+      </div>
+    </div>
+  </div>
+);
 
-// --- Logika Indikator (Basis: CoinGecko 'price' data) ---
-
-const calculateRSI = (data, period = 14) => {
-  let rsiData = [...data];
-  let gains = 0;
-  let losses = 0;
-
-  for (let i = 1; i < rsiData.length; i++) {
-    const change = rsiData[i].price - rsiData[i - 1].price;
-    rsiData[i].change = change;
-    
-    if (i <= period) {
-      if (change > 0) gains += change;
-      else losses -= change;
-    }
-  }
-  
-  if (rsiData.length <= period) return rsiData;
-
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
-
-  if (rsiData[period]) {
-    rsiData[period].avgGain = avgGain;
-    rsiData[period].avgLoss = avgLoss;
-  }
-
-  for (let i = period + 1; i < rsiData.length; i++) {
-    const change = rsiData[i].change;
-    let gain = change > 0 ? change : 0;
-    let loss = change < 0 ? -change : 0;
-
-    avgGain = (avgGain * (period - 1) + gain) / period;
-    avgLoss = (avgLoss * (period - 1) + loss) / period;
-
-    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    const rsi = 100 - (100 / (1 + rs));
-    rsiData[i] = { ...rsiData[i], rsi, avgGain, avgLoss };
-  }
-  return rsiData;
-};
-
-const calculateStochastic = (data, period = 14, kSlowing = 3) => {
-  let stochasticData = [...data];
-  for (let i = period - 1; i < stochasticData.length; i++) {
-    const periodSlice = stochasticData.slice(i - period + 1, i + 1);
-    // Karena kita cuma punya 'price', kita anggap 'price' = 'low', 'high', dan 'close'
-    const lowestLow = Math.min(...periodSlice.map(d => d.price));
-    const highestHigh = Math.max(...periodSlice.map(d => d.price));
-    const currentPrice = stochasticData[i].price;
-
-    if (highestHigh - lowestLow === 0) {
-      stochasticData[i].k = 50; 
-    } else {
-      const k = ((currentPrice - lowestLow) / (highestHigh - lowestLow)) * 100;
-      stochasticData[i].k = k;
-    }
-  }
-
-  // Calculate %D (Moving Average of %K)
-  for (let i = period - 1 + kSlowing - 1; i < stochasticData.length; i++) {
-    const kSlice = stochasticData.slice(i - kSlowing + 1, i + 1);
-    const d = kSlice.reduce((sum, d) => sum + (d.k || 0), 0) / kSlowing;
-    stochasticData[i].d = d;
-  }
-  return stochasticData;
-};
-
-
-// --- Komponen Utama Aplikasi ---
+// --- Halaman Utama ---
 
 export default function Home() {
-  const [coinPair, setCoinPair] = useState('ethereum'); // ID CoinGecko
-  const [indicator, setIndicator] = useState('rsi');
+  const [coinPair, setCoinPair] = useState('ethereum'); // bitcoin, ethereum, solana, ripple, bnb
+  const [indicator, setIndicator] = useState('rsi'); // rsi, stochastic, all
+  const [timeframe, setTimeframe] = useState('5m'); // 5m, 15m, 1h, 1d setting timeframe
   const [chartData, setChartData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [signal, setSignal] = useState({ side: 'NEUTRAL', message: 'Select an indicator to run analysis.' });
-  const [performance, setPerformance] = useState({ winRate: 0, trades: 0, pnl: 0, sharpe: 0 });
+  const [signal, setSignal] = useState('NEUTRAL');
+  const [performance, setPerformance] = useState({ winRate: 0, plRatio: 0, trades: 0, avgGain: 0 });
+  const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  const coinOptions = [
-    { value: 'ethereum', label: 'ETH/USD' },
-    { value: 'bitcoin', label: 'BTC/USD' },
-    { value: 'solana', label: 'SOL/USD' },
-    { value: 'dogecoin', label: 'DOGE/USD' },
-  ];
-  
-  // OPSI INDIKATOR BARU (FVG HILANG)
-  const indicatorOptions = [
-    { value: 'rsi', label: 'RSI (Relative Strength Index)' },
-    { value: 'stochastic', label: 'Stochastic Oscillator' },
-    { value: 'all', label: 'All Indicators (RSI + Stoch)' },
-  ];
+  // --- Fungsi Kalkulasi Indikator ---
 
-  // Fungsi untuk Fetch Data dan Menjalankan Analisis
-  const runStrategy = async (currentCoin = coinPair, currentIndicator = indicator) => {
-    setLoading(true);
-    setSignal({ side: 'NEUTRAL', message: 'Fetching new market data and analyzing...' });
+  // 1. Kalkulasi RSI
+  const calculateRSI = (data, period = 14) => {
+    let gains = 0;
+    let losses = 0;
 
-    try {
-      // 1. Fetch Data
-      const response = await fetch(`https://api.coingecko.com/api/v3/coins/${currentCoin}/market_chart?vs_currency=usd&days=1`);
-      if (!response.ok) throw new Error("Gagal fetch data. Coba lagi nanti.");
+    // Hitung average gain/loss awal
+    for (let i = 1; i <= period; i++) {
+      const change = data[i].close - data[i - 1].close;
+      if (change > 0) {
+        gains += change;
+      } else {
+        losses -= change; // losses are positive values
+      }
+    }
 
-      const data = await response.json();
-      
-      // API ini memberikan data 1-menit untuk 1 hari, kita anggap ini data 5m untuk demo
-      // Kita ambil 500 data poin terakhir
-      let parsedData = data.prices.slice(-500).map(item => ({
-        timestamp: item[0],
-        price: item[1],
-        time: new Date(item[0]).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-      }));
+    data[period].avgGain = gains / period;
+    data[period].avgLoss = losses / period;
 
-      // 2. Hitung Indikator
-      let dataWithRSI = calculateRSI(parsedData, 14);
-      let finalData = calculateStochastic(dataWithRSI, 14, 3);
-      
-      setChartData(finalData);
+    // Hitung RSI untuk sisa data
+    for (let i = period + 1; i < data.length; i++) {
+      const change = data[i].close - data[i - 1].close;
+      let gain = change > 0 ? change : 0;
+      let loss = change < 0 ? -change : 0;
 
-      // 3. Generate Sinyal
-      const lastData = finalData[finalData.length - 1];
-      if (!lastData) throw new Error("No data to analyze");
+      data[i].avgGain = (data[i - 1].avgGain * (period - 1) + gain) / period;
+      data[i].avgLoss = (data[i - 1].avgLoss * (period - 1) + loss) / period;
 
-      let longSignal = false;
-      let shortSignal = false;
-      let message = 'Hold. No clear signal based on strategy.';
+      if (data[i].avgLoss === 0) {
+        data[i].rsi = 100;
+      } else {
+        const rs = data[i].avgGain / data[i].avgLoss;
+        data[i].rsi = 100 - (100 / (1 + rs));
+      }
+    }
+    return data;
+  };
 
-      switch (currentIndicator) {
-        case 'rsi':
-          if (lastData.rsi < 30) { longSignal = true; message = 'RSI Oversold (< 30). Potential LONG.'; }
-          if (lastData.rsi > 70) { shortSignal = true; message = 'RSI Overbought (> 70). Potential SHORT.'; }
-          break;
-        case 'stochastic':
-          if (lastData.k < 20 && lastData.d < 20) { longSignal = true; message = 'Stochastic Oversold (< 20). Potential LONG.'; }
-          if (lastData.k > 80 && lastData.d > 80) { shortSignal = true; message = 'Stochastic Overbought (> 80). Potential SHORT.'; }
-          break;
-        case 'all': // Kombinasi RSI + Stoch
-          if (lastData.rsi < 30 && lastData.k < 20) {
-            longSignal = true; message = 'RSI & Stoch Confirmed Oversold. Strong LONG.';
-          } else if (lastData.rsi > 70 && lastData.k > 80) {
-            shortSignal = true; message = 'RSI & Stoch Confirmed Overbought. Strong SHORT.';
-          } else if (lastData.rsi < 35 || lastData.k < 25) {
-            longSignal = true; message = 'RSI or Stoch shows Oversold. Potential LONG.';
-          } else if (lastData.rsi > 65 || lastData.k > 75) {
-            shortSignal = true; message = 'RSI or Stoch shows Overbought. Potential SHORT.';
-          }
-          break;
+  // 2. Kalkulasi Stochastic (INI LOGIKA YANG BENAR MENGGUNAKAN OHLC)
+  const calculateStochastic = (data, kPeriod = 14, dPeriod = 3) => {
+    for (let i = kPeriod - 1; i < data.length; i++) {
+      const slice = data.slice(i - kPeriod + 1, i + 1);
+      let lowestLow = slice[0].low;
+      let highestHigh = slice[0].high;
+
+      for (let j = 1; j < slice.length; j++) {
+        if (slice[j].low < lowestLow) lowestLow = slice[j].low;
+        if (slice[j].high > highestHigh) highestHigh = slice[j].high;
       }
 
-      if (longSignal) setSignal({ side: 'LONG', message });
-      else if (shortSignal) setSignal({ side: 'SHORT', message });
-      else setSignal({ side: 'NEUTRAL', message });
+      const currentClose = data[i].close;
+      if (highestHigh - lowestLow === 0) {
+        data[i].stochK = 100; // Hindari pembagian dengan nol
+      } else {
+        data[i].stochK = ((currentClose - lowestLow) / (highestHigh - lowestLow)) * 100;
+      }
+    }
 
-      // 4. MOCK Backtest
+    // Hitung %D (Simple Moving Average dari %K)
+    for (let i = kPeriod + dPeriod - 2; i < data.length; i++) {
+      let sumK = 0;
+      for (let j = 0; j < dPeriod; j++) {
+        sumK += data[i - j].stochK;
+      }
+      data[i].stochD = sumK / dPeriod;
+    }
+    return data;
+  };
+
+  // --- Fungsi Utama: Fetch Data dan Menjalankan Analisis ---
+
+  const runStrategy = async (currentCoin = coinPair,
+    currentIndicator = indicator,
+    currentTimeframe = timeframe) => {
+    setIsLoading(true);
+    console.log(`Running strategy for ${currentCoin}  in ${currentTimeframe} using ${currentIndicator}...`);
+
+    // Mapping nama dropdown ke simbol API Asterdex
+    const coinMap = {
+      bitcoin: "BTCUSDT",
+      ethereum: "ETHUSDT",
+      solana: "SOLUSDT",
+      ripple: "XRPUSDT",
+      bnb: "BNBUSDT",
+      hyperliquid: "HYPEUSDT",
+      aster: "ASTERUSDT",
+    };
+    const symbol = coinMap[currentCoin];
+    if (!symbol) {
+      console.error("Invalid coin pair selected");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Fetch Data dari Asterdex (Endpoint /klines)
+      // Mengambil 300 data 5-menit terakhir
+      const response = await fetch(`https://fapi.asterdex.com/fapi/v1/klines?symbol=${symbol}&interval=${currentTimeframe}&limit=300`);
+
+      if (!response.ok) throw new Error("Failed to fetch market data from Asterdex");
+
+      const klines = await response.json();
+
+      // 2. Format Data (Asterdex/Binance format: [timestamp, open, high, low, close, ...])
+      let formattedData = klines.map(d => ({
+        time: parseInt(d[0]),
+        open: parseFloat(d[1]),
+        high: parseFloat(d[2]),
+        low: parseFloat(d[3]),
+        close: parseFloat(d[4]),
+        price: parseFloat(d[4]), // 'price' untuk chart utama
+        // inisialisasi nilai indikator
+        rsi: null,
+        stochK: null,
+        stochD: null,
+      }));
+
+      // 3. Kalkulasi Indikator
+      if (currentIndicator === 'rsi' || currentIndicator === 'all') {
+        formattedData = calculateRSI(formattedData);
+      }
+      if (currentIndicator === 'stochastic' || currentIndicator === 'all') {
+        formattedData = calculateStochastic(formattedData);
+      }
+
+      setChartData(formattedData);
+
+      // 4. Ambil data terbaru untuk sinyal
+      const latestData = formattedData[formattedData.length - 1];
+      if (!latestData) {
+        setSignal('NEUTRAL');
+        setIsLoading(false);
+        return;
+      }
+
+      // 5. Logika Sinyal (Berdasarkan Indikator)
+      let currentSignal = 'NEUTRAL';
+      switch (currentIndicator) {
+        case 'rsi':
+          if (latestData.rsi < 30) currentSignal = 'LONG';
+          else if (latestData.rsi > 70) currentSignal = 'SHORT';
+          break;
+        case 'stochastic':
+          if (latestData.stochK > 80 && latestData.stochD > 80) currentSignal = 'SHORT';
+          else if (latestData.stochK < 20 && latestData.stochD < 20) currentSignal = 'LONG';
+          break;
+        case 'all':
+          const rsiSignal = latestData.rsi < 30 ? 'LONG' : (latestData.rsi > 70 ? 'SHORT' : 'NEUTRAL');
+          const stochSignal = (latestData.stochK < 20 && latestData.stochD < 20) ? 'LONG' : ((latestData.stochK > 80 && latestData.stochD > 80) ? 'SHORT' : 'NEUTRAL');
+          
+          if (rsiSignal === 'LONG' && stochSignal === 'LONG') currentSignal = 'LONG';
+          else if (rsiSignal === 'SHORT' && stochSignal === 'SHORT') currentSignal = 'SHORT';
+          else currentSignal = 'NEUTRAL';
+          break;
+        default:
+          currentSignal = 'NEUTRAL';
+      }
+      setSignal(currentSignal);
+
+      // 6. Mockup Performance (Data Palsu)
       setPerformance({
-        winRate: 45 + (Math.random() * 20),
-        trades: 100 + Math.floor(Math.random() * 50),
-        pnl: -5 + (Math.random() * 25),
-        sharpe: 0.5 + (Math.random() * 1.0)
+        winRate: Math.floor(Math.random() * 30) + 40, // 40-70%
+        plRatio: (Math.random() * 1.5 + 1).toFixed(2), // 1.0 - 2.5
+        trades: Math.floor(Math.random() * 50) + 20, // 20-70
+        avgGain: (Math.random() * 0.5 + 0.2).toFixed(2), // 0.2% - 0.7%
       });
-      
-      setLastUpdated(new Date());
+
+      setLastUpdated(new Date().toLocaleTimeString());
 
     } catch (error) {
-      console.error("Strategy run failed:", error);
-      setSignal({ side: 'NEUTRAL', message: `Error: ${error.message}` });
+      console.error("Strategy execution failed:", error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // useEffect untuk auto-refresh
+  // --- UseEffect Hooks ---
+
+  // Hook untuk menjalankan strategi saat koin atau indikator berubah
   useEffect(() => {
-    // Jalankan pertama kali
-    runStrategy(coinPair, indicator);
+    runStrategy(coinPair, indicator, timeframe);
 
-    // Set timer untuk refresh setiap 3 menit (180000 ms)
+    // Set interval untuk auto-refresh setiap 3 menit
     const intervalId = setInterval(() => {
+      console.log("Auto-refreshing data...");
       runStrategy(coinPair, indicator);
-    }, 180000); 
+    }, 3 * 60 * 1000); // 3 menit
 
-    // Bersihkan timer saat komponen ganti
+    // Membersihkan interval saat komponen unmount atau dependencies berubah
     return () => clearInterval(intervalId);
-  }, [coinPair, indicator]); // Dependensi: Akan reset timer jika coin atau indikator ganti
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coinPair, indicator, timeframe]); // Dependensi: jalankan ulang jika koin atau indikator berubah serta timeframe
+
+  // --- Helper untuk Format Chart ---
+  const formatXAxis = (tickItem) => {
+    return new Date(tickItem).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
   
-  // Custom Tooltip untuk Chart (DI-UPDATE)
-  const CustomTooltip = ({ active, payload, label }) => {
+  const formatTooltipPrice = (value) => `$${value.toFixed(2)}`;
+  
+  const formatTooltipTime = (label) => new Date(label).toLocaleString();
+
+  // Custom Tooltip untuk Chart Indikator
+  const CustomIndicatorTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
       return (
-        <div className="bg-gray-900/80 backdrop-blur-sm border border-gray-600 p-3 rounded-md text-sm">
-          <p className="text-gray-300">{`Time: ${label}`}</p>
-          <p className="text-cyan-400">{`Price: $${data.price.toFixed(2)}`}</p>
-          {data.rsi && <p className="text-purple-400">{`RSI: ${data.rsi.toFixed(2)}`}</p>}
-          {data.k && <p className="text-yellow-400">{`Stoch %K: ${data.k.toFixed(2)}`}</p>}
-          {data.d && <p className="text-orange-400">{`Stoch %D: ${data.d.toFixed(2)}`}</p>}
+        <div className="bg-gray-800 border border-gray-700 p-3 rounded-lg shadow-lg text-sm">
+          <p className="text-gray-300 font-semibold mb-1">{formatTooltipTime(label)}</p>
+          {payload.find(p => p.dataKey === 'rsi') && (
+            <p style={{ color: '#8884d8' }}>{`RSI: ${payload.find(p => p.dataKey === 'rsi').value.toFixed(2)}`}</p>
+          )}
+          {payload.find(p => p.dataKey === 'stochK') && (
+             <p style={{ color: '#facc15' }}>{`%K: ${payload.find(p => p.dataKey === 'stochK').value.toFixed(2)}`}</p>
+          )}
+           {payload.find(p => p.dataKey === 'stochD') && (
+             <p style={{ color: '#f87171' }}>{`%D: ${payload.find(p => p.dataKey === 'stochD').value.toFixed(2)}`}</p>
+          )}
         </div>
       );
     }
     return null;
   };
 
+  // --- Render JSX ---
+
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-200 flex p-4" 
-         style={{
-           backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0, 190, 255, 0.1) 1px, transparent 0)',
-           backgroundSize: '20px 20px'
-         }}>
-      
-      {/* --- Sidebar --- */}
-      <aside className="w-1/4 max-w-sm p-5 bg-gray-900/80 backdrop-blur-md border border-gray-800 rounded-xl flex flex-col">
-        <div className="flex items-center mb-6">
-          <Zap className="w-8 h-8 text-cyan-400 mr-3" />
-          <h1 className="text-2xl font-bold text-white">Scalper&apos;s Edge</h1>
-        </div>
+    <main className="min-h-screen bg-gray-950 text-gray-100 p-4 md:p-8 relative">
+      <div className="max-w-7xl mx-auto">
         
-        {/* Controls */}
-        <div className="flex-grow">
-          <SelectDropdown
-            label="Coin Pair"
-            icon={Activity}
-            value={coinPair}
-            onChange={(val) => setCoinPair(val)}
-            options={coinOptions}
-          />
-          
-          <SelectDropdown
-            label="Indicator Strategy"
-            icon={BarChart2}
-            value={indicator}
-            onChange={(val) => setIndicator(val)}
-            options={indicatorOptions}
-          />
-          
-          <div className="mb-4">
-            <label className="flex items-center text-sm font-medium text-cyan-300 mb-1">
-              <Cpu className="w-4 h-4 mr-2" />
-              Timeframe (Source)
-            </label>
-            <div className="w-full bg-gray-900/50 border border-gray-700 rounded-md px-3 py-2 text-white opacity-50">
-              1-day data (from CoinGecko)
-            </div>
-          </div>
-          
-          {/* Status Update */}
-          <div className="text-center mt-4">
-            {loading ? (
-               <div className="text-cyan-400 text-sm flex items-center justify-center">
-                 <Cpu className="w-4 h-4 mr-2 animate-spin" />
-                 <span>Analyzing...</span>
-               </div>
-            ) : (
-              lastUpdated && (
-                <div className="text-gray-400 text-xs flex items-center justify-center">
-                  <Clock className="w-3 h-3 mr-1.5" />
-                  Last Updated: {lastUpdated.toLocaleTimeString()}
-                </div>
-              )
+        {/* Header */}
+        <header className="flex flex-wrap justify-between items-center mb-6 gap-4">
+          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+            Scalper&apos;s Edge
+          </h1>
+          <div className="flex items-center gap-4 text-sm text-gray-400">
+            {isLoading && (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Analyzing...</span>
+              </>
+            )}
+            {lastUpdated && !isLoading && (
+              <>
+                <Clock className="w-5 h-5" />
+                <span>Last Updated: {lastUpdated}</span>
+              </>
             )}
           </div>
-        </div>
-        
-        {/* Performance Panel */}
-        <div className="mt-6">
-          <PerformancePanel performance={performance} />
-        </div>
-      </aside>
+        </header>
 
-      {/* --- Main Content --- */}
-      <main className="flex-1 pl-6 flex flex-col">
-        {/* Signal Panel */}
-        <div className="mb-5">
-          <SignalPanel signal={signal} />
-        </div>
+        {/* Grid Utama */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Chart Area */}
-        <div className="flex-1 bg-gray-900/80 backdrop-blur-sm border border-gray-800 rounded-xl p-5">
-          <h2 className="text-xl font-semibold text-white mb-4 capitalize">{coinPair} - Price Chart</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" />
-              <XAxis dataKey="time" stroke="#718096" fontSize={12} />
-              <YAxis domain={['auto', 'auto']} stroke="#718096" fontSize={12} orientation="right" />
-              <Tooltip content={<CustomTooltip />} />
-              <Line type="monotone" dataKey="price" stroke="#00BFFF" strokeWidth={2} dot={false} name="Price" />
-            </LineChart>
-          </ResponsiveContainer>
+          {/* Kolom Kontrol & Sinyal (Kiri) */}
+          <div className="lg:col-span-1 flex flex-col gap-6">
+            
+            {/* Kontrol */}
+            <ControlCard>
+              <div className="grid grid-cols-3 gap-4">
+                {/* Pilih Koin */}
+                <div>
+                  <label htmlFor="coinPair" className="block text-sm font-medium text-gray-400 mb-2">
+                    <Coins className="w-4 h-4 inline-block mr-1" />
+                    Coin Pair
+                  </label>
+                  <select
+                    id="coinPair"
+                    value={coinPair}
+                    onChange={(e) => setCoinPair(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="ethereum">ETH/USDT</option>
+                    <option value="bitcoin">BTC/USDT</option>
+                    <option value="solana">SOL/USDT</option>
+                    <option value="ripple">XRP/USDT</option>
+                    <option value="bnb">BNB/USDT</option>
+                    <option value="hyperliquid">HYPE/USDT</option>
+                    <option value="aster">ASTER/USDT</option>
+                  </select>
+                </div>
 
-          <h2 className="text-xl font-semibold text-white mb-4 mt-6">Indicator Chart</h2>
-          <ResponsiveContainer width="100%" height={200}>
-            {/* CHART INDIKATOR BARU UNTUK NAMPILIN SEMUA */}
-            <ComposedChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" />
-                <XAxis dataKey="time" stroke="#718096" fontSize={12} />
-                <YAxis domain={[0, 100]} stroke="#718096" fontSize={12} orientation="right" />
-                <Tooltip content={<CustomTooltip />} />
-                
-                {/* RSI */}
-                <Line
-                  type="monotone"
-                  dataKey={indicator === 'all' || indicator === 'rsi' ? 'rsi' : null} // Hanya tampil jika dipilih
-                  stroke="#9F7AEA" strokeWidth={2} dot={false} name="RSI"
-                  connectNulls // Biar garis nggak putus
-                />
-                
-                {/* STOCHASTIC */}
-                <Line
-                  type="monotone"
-                  dataKey={indicator === 'all' || indicator === 'stochastic' ? 'k' : null} // Hanya tampil jika dipilih
-                  stroke="#F6E05E" strokeWidth={2} dot={false} name="%K"
-                  connectNulls
-                />
-                <Line
-                  type="monotone"
-                  dataKey={indicator === 'all' || indicator === 'stochastic' ? 'd' : null} // Hanya tampil jika dipilih
-                  stroke="#F56565" strokeWidth={2} dot={false} name="%D"
-                  connectNulls
-                />
-            </ComposedChart>
-          </ResponsiveContainer>
+                {/* Pilih Timeframe */}
+                <div>
+                  <label htmlFor="timeframe" className='block text-sm font-medium text-gray-400 mb-2'>
+                    <Clock className='w-4 h-4 inline-block mr-1'/>
+                    Timeframe
+                  </label>
+                  <select 
+                    id="timeframe"
+                    value={timeframe}
+                    onChange={(e) => setTimeframe(e.target.value)}
+                    className='w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500'
+                  >
+                    <option value="5m">5m</option>
+                    <option value="15m">15m</option>
+                    <option value="1h">1h</option>
+                    <option value="1d">1d</option>
+                  </select>
+                </div>
+
+                {/* Pilih Indikator */}
+                <div>
+                  <label htmlFor="indicator" className="block text-sm font-medium text-gray-400 mb-2">
+                    <Brain className="w-4 h-4 inline-block mr-1" />
+                    Indicator
+                  </label>
+                  <select
+                    id="indicator"
+                    value={indicator}
+                    onChange={(e) => setIndicator(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="rsi">RSI</option>
+                    <option value="stochastic">Stochastic</option>
+                    <option value="all">Combination (All)</option>
+                  </select>
+                </div>
+              </div>
+            </ControlCard>
+
+            {/* Sinyal */}
+            {isLoading ? (
+              <div className="flex justify-center items-center h-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg">
+                <Loader2 className="w-12 h-12 text-indigo-400 animate-spin" />
+              </div>
+            ) : (
+              <SignalCard signal={signal} timeframe={timeframe} />
+            )}
+
+            {/* Performa */}
+            {isLoading ? (
+               <div className="flex justify-center items-center h-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg">
+                 <Loader2 className="w-12 h-12 text-gray-600 animate-spin" />
+               </div>
+            ) : (
+              <PerformanceCard performance={performance} />
+            )}
+          </div>
+
+          {/* Kolom Chart (Kanan) */}
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            
+            {/* Chart Harga */}
+            <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 shadow-lg h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#818cf8" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#818cf8" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(31, 41, 55, 0.8)', // bg-gray-800 with opacity
+                      borderColor: '#4b5563', // border-gray-600
+                      borderRadius: '0.5rem', // rounded-lg
+                      backdropFilter: 'blur(4px)',
+                    }}
+                    labelStyle={{ color: '#d1d5db' }} // text-gray-300
+                    itemStyle={{ color: '#c7d2fe' }} // text-indigo-300
+                    formatter={formatTooltipPrice}
+                    labelFormatter={formatTooltipTime}
+                  />
+                  <XAxis 
+                    dataKey="time" 
+                    tickFormatter={formatXAxis} 
+                    stroke="#6b7280" // text-gray-500
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    orientation="right" 
+                    domain={['auto', 'auto']}
+                    stroke="#6b7280"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(val) => `$${val.toLocaleString()}`}
+                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <Area 
+                    type="monotone" 
+                    dataKey="price" 
+                    stroke="#818cf8" // indigo-400
+                    fill="url(#colorPrice)" 
+                    strokeWidth={2} 
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Chart Indikator */}
+            <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 shadow-lg h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+                  <Tooltip content={<CustomIndicatorTooltip />} />
+                  <XAxis 
+                    dataKey="time" 
+                    tickFormatter={formatXAxis} 
+                    stroke="#6b7280"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    orientation="right" 
+                    domain={[0, 100]}
+                    ticks={[10, 20, 30, 50, 70, 80, 90]}
+                    stroke="#6b7280"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+
+                  {/* Garis Horizontal */}
+                  <Line type="monotone" dataKey={() => 80} stroke="#f87171" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" />
+                  <Line type="monotone" dataKey={() => 70} stroke="#facc15" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" />
+                  <Line type="monotone" dataKey={() => 30} stroke="#a7f3d0" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" />
+                  <Line type="monotone" dataKey={() => 20} stroke="#a7f3d0" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" />
+
+                  {/* Garis Indikator */}
+                  {(indicator === 'rsi' || indicator === 'all') && (
+                    <Line type="monotone" dataKey="rsi" stroke="#8884d8" strokeWidth={2} dot={false} />
+                  )}
+                  {(indicator === 'stochastic' || indicator === 'all') && (
+                    <>
+                      <Line type="monotone" dataKey="stochK" stroke="#facc15" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="stochD" stroke="#f87171" strokeWidth={1.5} dot={false} />
+                    </>
+                  )}
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            
+          </div>
         </div>
-      </main>
-      
-       {/* --- Watermark --- */}
-      <div className="absolute bottom-4 right-8 text-xs text-gray-700/50 pointer-events-none">
+      </div>
+      {/* Watermark */}
+      <div className="absolute bottom-4 right-4 text-xs text-gray-700 font-mono opacity-50">
         copyright 2025 by Kgs Raka Renata, helped by gemini
       </div>
-
-    </div>
+    </main>
   );
 }
 

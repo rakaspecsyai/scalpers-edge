@@ -4,9 +4,7 @@ A futuristic, React-based dashboard prototype designed to identify potential cry
 
 This project was built as a high-fidelity prototype to explore strategy visualization and front-end data handling with Next.js.
 
-
 ## 🚀 Features
-
 
 "Real-Time-ish" Data: Automatically fetches 1-day market data (1-minute granularity) from the CoinGecko API every 3 minutes.
 
@@ -26,37 +24,32 @@ Mocked Performance: A simulated "Backtest Performance" panel (displaying Win Rat
 
 Futuristic UI: A responsive, dark-mode dashboard built with Next.js and Tailwind CSS, using lucide-react for icons.
 
-
 ## 🛠️ Tech Stack
 
+- ### Framework: Next.js 14+ (App Router)
 
-- #### Framework: Next.js 14+ (App Router)
+- ### Language: JavaScript (React)
 
-- #### Language: JavaScript (React)
+- ### Styling: Tailwind CSS
 
-- #### Styling: Tailwind CSS
+- ### Data Visualization: Recharts
 
-- #### Data Visualization: Recharts
+- ### Icons: Lucide React
 
-- #### Icons: Lucide React
-
-- #### Data Source: CoinGecko Public API
-
+- ### Data Source: CoinGecko Public API
 
 ## 💻 Getting Started (Running Locally)
 
-
 Follow these steps to get the project running on your local machine.
 
-## Prerequisites:
+## Prerequisites
 
 **Node.js (v18.0 or later recommended) installed on your system.**
 
-
-## Installation & Setup:
-
+## Installation & Setup
 
 Create a new Next.js project:
+
 ```bash
 npx create-next-app@latest scalpers-edge
 ```
@@ -103,12 +96,10 @@ Open your browser and navigate to `http://localhost:3000` to see the dashboard l
 
 ## ⚠️ Important Disclaimer
 
-This is a prototype for educational and demonstration purposes only. It is NOT intended for live trading.
-
-Data Limitations: The CoinGecko API provides 1-minute granularity data, which is used here to simulate a 5m timeframe. Furthermore, the API only provides a single price point, not true OHLC (Open, High, Low, Close) data. This limits the accuracy of indicators like the Stochastic Oscillator.
-
 Mocked Backtesting: The "Backtest Performance" panel is 100% simulated with random data on each run. It does not reflect the true historical performance of the strategies shown.
 
-No Financial Advice: The signals generated are illustrative and should not be considered financial advice.
+Data Specialization: This market data uses ASTERDEX api. The klines data may vary againts others CEX/DEX. This is purely open source, you can edit the market data you want.
+
+No Financial Advice: The signals generated should not be considered financial advice. Nothing is certain.
 
 ***2025 by Kgs Raka Renata, helped by gemini***
