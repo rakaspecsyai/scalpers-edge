@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, ComposedChart } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, Loader2, Brain, Check, BarChart2, Zap, Clock, Coins, Network } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, ComposedChart } from 'recharts';
+import { Loader2, Brain, Clock, Coins } from 'lucide-react';
 import ControlCard from './components/ControlCard';
 import SignalCard from './components/SignalCard';
 import PerformanceCard from './components/PerformanceCard';
