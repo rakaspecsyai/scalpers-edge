@@ -1,4 +1,5 @@
- import React from "react";
+import React from "react";
+import { formatTooltipTime } from './formatToolTipTime';
  
  const CustomIndicatorTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {

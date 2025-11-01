@@ -7,7 +7,9 @@ import SignalCard from './components/SignalCard';
 import PerformanceCard from './components/PerformanceCard';
 import calculateRSI from './components/indicators/calculateRSI';
 import calculateStochastic from './components/indicators/calculateStochastic';
-import CustomIndicatorTooltip from './components/customIndicatorTooltip';
+import CustomIndicatorTooltip from './components/CustomIndicatorTooltip';
+import formatTooltipPrice from './components/formatToolTipPrice';
+import formatTooltipTime from './components/formatToolTipTime'; 
 
 // --- Komponen UI ---
 
@@ -162,10 +164,6 @@ const runStrategy = async (currentCoin = coinPair,
   const formatXAxis = (tickItem) => {
     return new Date(tickItem).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
-  
-  const formatTooltipPrice = (value) => `$${value.toFixed(2)}`;
-  
-  const formatTooltipTime = (label) => new Date(label).toLocaleString();
 
   // Custom Tooltip untuk Chart Indikator
  
