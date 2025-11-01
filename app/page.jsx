@@ -2,64 +2,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, ComposedChart } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Loader2, Brain, Check, BarChart2, Zap, Clock, Coins, Network } from 'lucide-react';
+import ControlCard from './components/ControlCard';
+import SignalCard from './components/SignalCard';
+import PerformanceCard from './components/PerformanceCard';
+import calculateRSI from './components/indicators/calculateRSI';
+import calculateStochastic from './components/indicators/calculateStochastic';
+import runStrategy from './components/runStrategy';
+import CustomIndicatorTooltip from './components/customIndicatorTooltip';
 
 // --- Komponen UI ---
 
-// Kartu untuk Dropdown Kontrol
-const ControlCard = ({ children }) => (
-  <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 shadow-lg">{children}</div>
-);
-
-// Kartu untuk Menampilkan Sinyal
-const SignalCard = ({ signal, timeframe }) => {
-  const signalConfig = {
-    LONG: { icon: TrendingUp, color: 'text-green-500', bgColor: 'bg-green-900' },
-    SHORT: { icon: TrendingDown, color: 'text-red-500', bgColor: 'bg-red-900' },
-    NEUTRAL: { icon: Minus, color: 'text-yellow-500', bgColor: 'bg-yellow-900' },
-  };
-  const { icon: Icon, color, bgColor } = signalConfig[signal] || signalConfig.NEUTRAL;
-
-  return (
-    <div className={`rounded-lg p-6 shadow-xl ${bgColor} border border-gray-700`}>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-200">Signal ({timeframe})</h3>
-        <Icon className={`w-6 h-6 ${color}`} />
-      </div>
-      <div className={`text-5xl font-bold ${color} text-center animate-pulse`}>
-        {signal}
-      </div>
-      <p className="text-center text-gray-400 mt-2">Based on selected indicator(s)</p>
-    </div>
-  );
-};
-
-// Kartu untuk Menampilkan Performa (Mockup)
-const PerformanceCard = ({ performance }) => (
-  <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 shadow-lg">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-semibold text-gray-200">Backtest Performance (Mock)</h3>
-      <BarChart2 className="w-6 h-6 text-indigo-400" />
-    </div>
-    <div className="grid grid-cols-2 gap-4 text-center">
-      <div>
-        <p className="text-sm text-gray-400">Win Rate</p>
-        <p className="text-2xl font-semibold text-green-500">{performance.winRate}%</p>
-      </div>
-      <div>
-        <p className="text-sm text-gray-400">P/L Ratio</p>
-        <p className="text-2xl font-semibold text-gray-200">{performance.plRatio}</p>
-      </div>
-      <div>
-        <p className="text-sm text-gray-400">Trades</p>
-        <p className="text-2xl font-semibold text-gray-200">{performance.trades}</p>
-      </div>
-      <div>
-        <p className="text-sm text-gray-400">Avg. Gain</p>
-        <p className="text-2xl font-semibold text-green-500">{performance.avgGain}%</p>
-      </div>
-    </div>
-  </div>
-);
+// Kartu untuk Dropdown Kontrol ada di ControlCard.jsx
+// Kartu untuk Menampilkan Sinyal ada di SignalCard.jsx
+// Kartu untuk Menampilkan Performa (Mockup) ada di PerformanceCard.jsx
 
 // --- Halaman Utama ---
 
@@ -75,180 +30,11 @@ export default function Home() {
 
   // --- Fungsi Kalkulasi Indikator ---
 
-  // 1. Kalkulasi RSI
-  const calculateRSI = (data, period = 14) => {
-    let gains = 0;
-    let losses = 0;
+  // 1. Kalkulasi RSI ada di calculateRSI.jsx
+  // 2. Kalkulasi Stochastic (INI LOGIKA YANG BENAR MENGGUNAKAN OHLC) ada di calculateStochastic.jsx
 
-    // Hitung average gain/loss awal
-    for (let i = 1; i <= period; i++) {
-      const change = data[i].close - data[i - 1].close;
-      if (change > 0) {
-        gains += change;
-      } else {
-        losses -= change; // losses are positive values
-      }
-    }
+  // --- Fungsi Utama: Fetch Data dan Menjalankan Analisis (ada di file runStrategy.jsx)---
 
-    data[period].avgGain = gains / period;
-    data[period].avgLoss = losses / period;
-
-    // Hitung RSI untuk sisa data
-    for (let i = period + 1; i < data.length; i++) {
-      const change = data[i].close - data[i - 1].close;
-      let gain = change > 0 ? change : 0;
-      let loss = change < 0 ? -change : 0;
-
-      data[i].avgGain = (data[i - 1].avgGain * (period - 1) + gain) / period;
-      data[i].avgLoss = (data[i - 1].avgLoss * (period - 1) + loss) / period;
-
-      if (data[i].avgLoss === 0) {
-        data[i].rsi = 100;
-      } else {
-        const rs = data[i].avgGain / data[i].avgLoss;
-        data[i].rsi = 100 - (100 / (1 + rs));
-      }
-    }
-    return data;
-  };
-
-  // 2. Kalkulasi Stochastic (INI LOGIKA YANG BENAR MENGGUNAKAN OHLC)
-  const calculateStochastic = (data, kPeriod = 14, dPeriod = 3) => {
-    for (let i = kPeriod - 1; i < data.length; i++) {
-      const slice = data.slice(i - kPeriod + 1, i + 1);
-      let lowestLow = slice[0].low;
-      let highestHigh = slice[0].high;
-
-      for (let j = 1; j < slice.length; j++) {
-        if (slice[j].low < lowestLow) lowestLow = slice[j].low;
-        if (slice[j].high > highestHigh) highestHigh = slice[j].high;
-      }
-
-      const currentClose = data[i].close;
-      if (highestHigh - lowestLow === 0) {
-        data[i].stochK = 100; // Hindari pembagian dengan nol
-      } else {
-        data[i].stochK = ((currentClose - lowestLow) / (highestHigh - lowestLow)) * 100;
-      }
-    }
-
-    // Hitung %D (Simple Moving Average dari %K)
-    for (let i = kPeriod + dPeriod - 2; i < data.length; i++) {
-      let sumK = 0;
-      for (let j = 0; j < dPeriod; j++) {
-        sumK += data[i - j].stochK;
-      }
-      data[i].stochD = sumK / dPeriod;
-    }
-    return data;
-  };
-
-  // --- Fungsi Utama: Fetch Data dan Menjalankan Analisis ---
-
-  const runStrategy = async (currentCoin = coinPair,
-    currentIndicator = indicator,
-    currentTimeframe = timeframe) => {
-    setIsLoading(true);
-    console.log(`Running strategy for ${currentCoin}  in ${currentTimeframe} using ${currentIndicator}...`);
-
-    // Mapping nama dropdown ke simbol API Asterdex
-    const coinMap = {
-      bitcoin: "BTCUSDT",
-      ethereum: "ETHUSDT",
-      solana: "SOLUSDT",
-      ripple: "XRPUSDT",
-      bnb: "BNBUSDT",
-      hyperliquid: "HYPEUSDT",
-      aster: "ASTERUSDT",
-    };
-    const symbol = coinMap[currentCoin];
-    if (!symbol) {
-      console.error("Invalid coin pair selected");
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      // 1. Fetch Data dari Asterdex (Endpoint /klines)
-      // Mengambil 300 data 5-menit terakhir
-      const response = await fetch(`https://fapi.asterdex.com/fapi/v1/klines?symbol=${symbol}&interval=${currentTimeframe}&limit=300`);
-
-      if (!response.ok) throw new Error("Failed to fetch market data from Asterdex");
-
-      const klines = await response.json();
-
-      // 2. Format Data (Asterdex/Binance format: [timestamp, open, high, low, close, ...])
-      let formattedData = klines.map(d => ({
-        time: parseInt(d[0]),
-        open: parseFloat(d[1]),
-        high: parseFloat(d[2]),
-        low: parseFloat(d[3]),
-        close: parseFloat(d[4]),
-        price: parseFloat(d[4]), // 'price' untuk chart utama
-        // inisialisasi nilai indikator
-        rsi: null,
-        stochK: null,
-        stochD: null,
-      }));
-
-      // 3. Kalkulasi Indikator
-      if (currentIndicator === 'rsi' || currentIndicator === 'all') {
-        formattedData = calculateRSI(formattedData);
-      }
-      if (currentIndicator === 'stochastic' || currentIndicator === 'all') {
-        formattedData = calculateStochastic(formattedData);
-      }
-
-      setChartData(formattedData);
-
-      // 4. Ambil data terbaru untuk sinyal
-      const latestData = formattedData[formattedData.length - 1];
-      if (!latestData) {
-        setSignal('NEUTRAL');
-        setIsLoading(false);
-        return;
-      }
-
-      // 5. Logika Sinyal (Berdasarkan Indikator)
-      let currentSignal = 'NEUTRAL';
-      switch (currentIndicator) {
-        case 'rsi':
-          if (latestData.rsi < 30) currentSignal = 'LONG';
-          else if (latestData.rsi > 70) currentSignal = 'SHORT';
-          break;
-        case 'stochastic':
-          if (latestData.stochK > 80 && latestData.stochD > 80) currentSignal = 'SHORT';
-          else if (latestData.stochK < 20 && latestData.stochD < 20) currentSignal = 'LONG';
-          break;
-        case 'all':
-          const rsiSignal = latestData.rsi < 30 ? 'LONG' : (latestData.rsi > 70 ? 'SHORT' : 'NEUTRAL');
-          const stochSignal = (latestData.stochK < 20 && latestData.stochD < 20) ? 'LONG' : ((latestData.stochK > 80 && latestData.stochD > 80) ? 'SHORT' : 'NEUTRAL');
-          
-          if (rsiSignal === 'LONG' && stochSignal === 'LONG') currentSignal = 'LONG';
-          else if (rsiSignal === 'SHORT' && stochSignal === 'SHORT') currentSignal = 'SHORT';
-          else currentSignal = 'NEUTRAL';
-          break;
-        default:
-          currentSignal = 'NEUTRAL';
-      }
-      setSignal(currentSignal);
-
-      // 6. Mockup Performance (Data Palsu)
-      setPerformance({
-        winRate: Math.floor(Math.random() * 30) + 40, // 40-70%
-        plRatio: (Math.random() * 1.5 + 1).toFixed(2), // 1.0 - 2.5
-        trades: Math.floor(Math.random() * 50) + 20, // 20-70
-        avgGain: (Math.random() * 0.5 + 0.2).toFixed(2), // 0.2% - 0.7%
-      });
-
-      setLastUpdated(new Date().toLocaleTimeString());
-
-    } catch (error) {
-      console.error("Strategy execution failed:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // --- UseEffect Hooks ---
 
@@ -264,7 +50,7 @@ export default function Home() {
 
     // Membersihkan interval saat komponen unmount atau dependencies berubah
     return () => clearInterval(intervalId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [coinPair, indicator, timeframe]); // Dependensi: jalankan ulang jika koin atau indikator berubah serta timeframe
 
   // --- Helper untuk Format Chart ---
@@ -277,26 +63,7 @@ export default function Home() {
   const formatTooltipTime = (label) => new Date(label).toLocaleString();
 
   // Custom Tooltip untuk Chart Indikator
-  const CustomIndicatorTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-gray-800 border border-gray-700 p-3 rounded-lg shadow-lg text-sm">
-          <p className="text-gray-300 font-semibold mb-1">{formatTooltipTime(label)}</p>
-          {payload.find(p => p.dataKey === 'rsi') && (
-            <p style={{ color: '#8884d8' }}>{`RSI: ${payload.find(p => p.dataKey === 'rsi').value.toFixed(2)}`}</p>
-          )}
-          {payload.find(p => p.dataKey === 'stochK') && (
-             <p style={{ color: '#facc15' }}>{`%K: ${payload.find(p => p.dataKey === 'stochK').value.toFixed(2)}`}</p>
-          )}
-           {payload.find(p => p.dataKey === 'stochD') && (
-             <p style={{ color: '#f87171' }}>{`%D: ${payload.find(p => p.dataKey === 'stochD').value.toFixed(2)}`}</p>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
-
+ 
   // --- Render JSX ---
 
   return (
