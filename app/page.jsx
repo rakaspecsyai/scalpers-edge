@@ -96,6 +96,9 @@ const runStrategy = async (currentCoin = coinPair,
       bnb: "BNBUSDT",
       hyperliquid: "HYPEUSDT",
       aster: "ASTERUSDT",
+      doge: "DOGEUSDT",
+      pepe: "PEPEUSDT",
+      shib: "SHIBUSDT",
     };
     const symbol = coinMap[currentCoin];
     if (!symbol) {
@@ -358,6 +361,9 @@ const runStrategy = async (currentCoin = coinPair,
                     <option value="bnb">BNB/USDT</option>
                     <option value="hyperliquid">HYPE/USDT</option>
                     <option value="aster">ASTER/USDT</option>
+                    <option value="doge">DOGE/USDT</option>
+                    <option value="pepe">PEPE/USDT</option>
+                    <option value="shib">SHIB/USDT</option>
                   </select>
                 </div>
 
