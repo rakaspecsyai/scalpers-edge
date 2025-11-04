@@ -97,7 +97,7 @@ export default function Home() {
   // --- Fungsi Kalkulasi Indikator ---
 
   // 1. Kalkulasi RSI
-  const calculateRSI = (data, period = 14) => {
+  const calculateRSI = (data, period = 3) => {
     // Memastikan data cukup
     if (data.length <= period) return data;
 
@@ -226,7 +226,7 @@ export default function Home() {
   };
 
   // 4. Kalkulasi Moving VWAP (MVWAP)
-  const calculateVWAP = (data, period = 20) => {
+  const calculateVWAP = (data, period = 12) => {
     // Memastikan data cukup
     if (data.length < period) return data;
 
@@ -250,6 +250,28 @@ export default function Home() {
     }
     return data;
   };
+
+  // 5. FUNGSI BARU: Kalkulasi On-Balance Volume (OBV)
+  const calculateOBV = (data) => {
+    if (data.length === 0) return data;
+
+    data[0].obv = 0; // Mulai OBV dari 0
+
+    for (let i = 1; i < data.length; i++) {
+      const prev = data[i-1];
+      const curr = data[i];
+
+      if (curr.close > prev.close) {
+        curr.obv = (prev.obv || 0) + curr.volume; // Tambah volume
+      } else if (curr.close < prev.close) {
+        curr.obv = (prev.obv || 0) - curr.volume; // Kurangi volume
+      } else {
+        curr.obv = (prev.obv || 0); // Tetap
+      }
+    }
+    return data;
+  };
+
 
   // --- MESIN BACKTEST BARU ---
   const runBacktest = (data, initialBalance = 100) => {
@@ -332,6 +354,7 @@ export default function Home() {
     };
   };
 
+  // --- FUNGSI AUDIO ---
   const playBeep = (type = 'long') => {
     // Hanya mainkan jika AudioContext sudah diinisialisasi oleh user
     if (!audioCtxRef.current) return;
@@ -360,7 +383,7 @@ export default function Home() {
 
         // Menghitung waktu mulai untuk setiap beep
         const startTime = audioCtxRef.current.currentTime + i * (beepDuration + gapDuration);
-        // const endTime = startTime + beepDuration;
+        const endTime = startTime + beepDuration;
 
         oscillator.start(startTime);
         oscillator.stop(startTime + beepDuration);
@@ -415,7 +438,7 @@ export default function Home() {
         volume: parseFloat(d[5]),
         price: parseFloat(d[4]),
         // Inisialisasi properti
-        rsi: null, stochK: null, stochD: null, fvgBull: null, fvgBear: null, vwap: null, signal: 'NEUTRAL'
+        rsi: null, stochK: null, stochD: null, fvgBull: null, fvgBear: null, vwap: null, obv: 0, signal: 'NEUTRAL'
       }));
 
       // 3. Kalkulasi SEMUA Indikator (kita hitung semua di awal)
@@ -423,6 +446,7 @@ export default function Home() {
       formattedData = calculateStochastic(formattedData);
       formattedData = calculateFVG(formattedData);
       formattedData = calculateVWAP(formattedData);
+      formattedData = calculateOBV(formattedData); // BARU: kalkulasi OBV
 
       // 4. (BARU) Generate Sinyal per Candle
       // Loop ini menentukan sinyal 'signal' di tiap candle, berdasarkan pilihan user
@@ -431,7 +455,7 @@ export default function Home() {
         const prevCandle = formattedData[i-1];
 
         // Dapatkan sinyal individual
-        let rsiSignal = 'NEUTRAL', stochSignal = 'NEUTRAL', fvgSignal = 'NEUTRAL', vwapSignal = 'NEUTRAL';
+        let rsiSignal = 'NEUTRAL', stochSignal = 'NEUTRAL', fvgSignal = 'NEUTRAL', vwapSignal = 'NEUTRAL', obvSignal = 'NEUTRAL'; // BARU: obvSignal
 
         if (candle.rsi < 10) rsiSignal = 'LONG';
         else if (candle.rsi > 90) rsiSignal = 'SHORT';
@@ -443,8 +467,13 @@ export default function Home() {
         if (prevCandle.fvgBull) fvgSignal = 'LONG';
         else if (prevCandle.fvgBear) fvgSignal = 'SHORT';
         
-        if (candle.close < candle.vwap) vwapSignal = 'LONG';
-        else if (candle.close > candle.vwap) vwapSignal = 'SHORT';
+        //Sinyal VWAP yang dikonfirmasi dengan OBV
+        if (candle.close < candle.vwap && candle.obv > (prevCandle.obv || 0)) vwapSignal = 'LONG';
+        else if (candle.close > candle.vwap && candle.obv < (prevCandle.obv || 0)) vwapSignal = 'SHORT';
+
+        // BARU: Sinyal OBV (Momentum Konfirmasi)
+        if (candle.obv > (prevCandle.obv || 0)) obvSignal = 'LONG';
+        else if (candle.obv < (prevCandle.obv || 0)) obvSignal = 'SHORT';
 
         // Terapkan sinyal ke candle berdasarkan pilihan 'indicator'
         switch (currentIndicator) {
@@ -460,10 +489,13 @@ export default function Home() {
           case 'vwap':
             candle.signal = vwapSignal;
             break;
-          case 'all':
-            if (rsiSignal === 'LONG' && stochSignal === 'LONG' && fvgSignal === 'LONG' && vwapSignal === 'LONG') {
+          case 'obv':
+            candle.signal = obvSignal;
+            break;
+          case 'all': // BARU: Di-upgrade jadi 5 indikator
+            if (rsiSignal === 'LONG' && stochSignal === 'LONG' && fvgSignal === 'LONG' && vwapSignal === 'LONG' && obvSignal === 'LONG') {
               candle.signal = 'LONG';
-            } else if (rsiSignal === 'SHORT' && stochSignal === 'SHORT' && fvgSignal === 'SHORT' && vwapSignal === 'SHORT') {
+            } else if (rsiSignal === 'SHORT' && stochSignal === 'SHORT' && fvgSignal === 'SHORT' && vwapSignal === 'SHORT' && obvSignal === 'SHORT') {
               candle.signal = 'SHORT';
             } else {
               candle.signal = 'NEUTRAL';
@@ -482,7 +514,7 @@ export default function Home() {
       const latestSignal = formattedData[formattedData.length - 1].signal || 'NEUTRAL'; 
       
       // --- LOGIKA MAIN SUARA ---
-      if (!isMuted && latestSignal !== signal) {
+      if (!isMuted && latestSignal && latestSignal !== signal) {
         if (latestSignal === 'LONG') {
           playBeep('long');
         } else if (latestSignal === 'SHORT') {
@@ -520,7 +552,7 @@ export default function Home() {
       const intervalId = setInterval(() => {
         console.log("Auto-refreshing data...");
         runStrategy(coinPair, indicator, timeframe);
-      }, 1 * 60 * 1000); // 3 menit jadi 1 menit
+      }, 1 * 60 * 1000); // 1 menit
 
       return () => clearInterval(intervalId);
     }
@@ -571,7 +603,7 @@ export default function Home() {
   
   const formatTooltipTime = (label) => new Date(label).toLocaleString();
 
-  // Custom Tooltip untuk Chart Indikator
+  // Custom Tooltip untuk Chart Indikator (DI-UPGRADE)
   const CustomIndicatorTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       // Temukan data point berdasarkan timestamp (label)
@@ -588,6 +620,10 @@ export default function Home() {
           )}
            {point?.stochD && (
              <p style={{ color: '#f87171' }}>{`%D: ${point.stochD.toFixed(2)}`}</p>
+          )}
+           {/* BARU: Tampilkan OBV */}
+           {point?.obv !== undefined && (
+             <p style={{ color: '#38bdf8' }}>{`OBV: ${point.obv.toLocaleString()}`}</p>
           )}
         </div>
       );
@@ -738,8 +774,10 @@ export default function Home() {
                     <option value="rsi">RSI</option>
                     <option value="stochastic">Stochastic</option>
                     <option value="fvg">FVG</option>
-                    <option value="vwap">VWAP</option>
-                    <option value="all">Combination</option>
+                    <option value="vwap">VWAP (OBV Confirmation)</option>
+                    <option value="obv">OBV</option>
+                    {/* <option value="vwap_obv">VWAP + OBV</option> */} {/* Kita gabung ke 'all' */}
+                    <option value="all">Combination (All 5)</option>
                   </select>
                 </div>
               </div>
@@ -828,7 +866,7 @@ export default function Home() {
               </ResponsiveContainer>
             </div>
 
-            {/* Chart Indikator */}
+            {/* Chart Indikator (DI-UPGRADE DENGAN DUAL AXIS) */}
             <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 shadow-lg h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
@@ -841,7 +879,9 @@ export default function Home() {
                     tickLine={false}
                     axisLine={false}
                   />
+                  {/* BARU: Y-Axis KIRI untuk RSI/Stoch */}
                   <YAxis 
+                    yAxisId="left"
                     orientation="right" 
                     domain={[0, 100]}
                     ticks={[10, 20, 30, 50, 70, 80, 90]}
@@ -850,23 +890,38 @@ export default function Home() {
                     tickLine={false}
                     axisLine={false}
                   />
+                  {/* BARU: Y-Axis KANAN untuk OBV */}
+                  {(indicator === 'all' || indicator === 'obv') && (
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="left" // Taruh di kiri biar nggak tabrakan
+                      domain={['auto', 'auto']}
+                      stroke="#38bdf8" // Warna biru OBV
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} // Format jadi ribuan (K)
+                    />
+                  )}
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
 
-                  {/* Garis Horizontal */}
-                  <Line type="monotone" dataKey={() => 80} stroke="#f87171" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" />
-                  <Line type="monotone" dataKey={() => 70} stroke="#facc15" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" />
-                  <Line type="monotone" dataKey={() => 30} stroke="#a7f3d0" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" />
-                  <Line type="monotone" dataKey={() => 20} stroke="#a7f3d0" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" />
+                  {/* Garis Horizontal (hanya untuk axis kiri) */}
+                  <ReferenceArea yAxisId="left" y1={80} y2={100} fill="rgba(248, 113, 113, 0.1)" stroke="none" />
+                  <ReferenceArea yAxisId="left" y1={0} y2={20} fill="rgba(167, 243, 208, 0.1)" stroke="none" />
 
                   {/* Garis Indikator */}
                   {(indicator === 'rsi' || indicator === 'all') && (
-                    <Line type="monotone" dataKey="rsi" stroke="#8884d8" strokeWidth={2} dot={false} />
+                    <Line yAxisId="left" type="monotone" dataKey="rsi" stroke="#8884d8" strokeWidth={2} dot={false} name="RSI" />
                   )}
                   {(indicator === 'stochastic' || indicator === 'all') && (
                     <>
-                      <Line type="monotone" dataKey="stochK" stroke="#facc15" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="stochD" stroke="#f87171" strokeWidth={1.5} dot={false} />
+                      <Line yAxisId="left" type="monotone" dataKey="stochK" stroke="#facc15" strokeWidth={2} dot={false} name="%K" />
+                      <Line yAxisId="left" type="monotone" dataKey="stochD" stroke="#f87171" strokeWidth={1.5} dot={false} name="%D" />
                     </>
+                  )}
+                  {/* BARU: Garis OBV (hanya muncul saat 'all') */}
+                  {(indicator === 'all' || indicator === 'obv') && (
+                    <Line yAxisId="right" type="monotone" dataKey="obv" stroke="#38bdf8" strokeWidth={2} dot={false} name="OBV" />
                   )}
                 </ComposedChart>
               </ResponsiveContainer>
