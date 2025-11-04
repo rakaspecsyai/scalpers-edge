@@ -443,8 +443,8 @@ export default function Home() {
         if (prevCandle.fvgBull) fvgSignal = 'LONG';
         else if (prevCandle.fvgBear) fvgSignal = 'SHORT';
         
-        if (candle.close > candle.vwap) vwapSignal = 'LONG';
-        else if (candle.close < candle.vwap) vwapSignal = 'SHORT';
+        if (candle.close < candle.vwap) vwapSignal = 'LONG';
+        else if (candle.close > candle.vwap) vwapSignal = 'SHORT';
 
         // Terapkan sinyal ke candle berdasarkan pilihan 'indicator'
         switch (currentIndicator) {
