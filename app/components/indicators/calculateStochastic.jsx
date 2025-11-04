@@ -1,4 +1,4 @@
- const calculateStochastic = (data, kPeriod = 14, dPeriod = 3) => {
+ const calculateStochastic = (data, kPeriod = 3, dPeriod = 3) => {
     for (let i = kPeriod - 1; i < data.length; i++) {
       const slice = data.slice(i - kPeriod + 1, i + 1);
       let lowestLow = slice[0].low;

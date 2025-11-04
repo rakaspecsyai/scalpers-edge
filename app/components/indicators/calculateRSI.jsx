@@ -1,4 +1,4 @@
-const calculateRSI = (data, period = 14) => {
+const calculateRSI = (data, period = 3) => {
     let gains = 0;
     let losses = 0;
 

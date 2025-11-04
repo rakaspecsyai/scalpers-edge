@@ -3,6 +3,7 @@ import { formatTooltipTime } from './formatToolTipTime';
  
  const CustomIndicatorTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload; // Ambil data candle lengkap jika perlu
       return (
         <div className="bg-gray-800 border border-gray-700 p-3 rounded-lg shadow-lg text-sm">
           <p className="text-gray-300 font-semibold mb-1">{formatTooltipTime(label)}</p>
