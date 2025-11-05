@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, ComposedChart, ReferenceArea } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Loader2, Brain, Check, BarChart2, Zap, Clock, Coins, Network, Bell, BellOff } from 'lucide-react';
+import { M_PLUS_1 } from 'next/font/google';
 
 // --- Komponen UI ---
 
@@ -200,6 +201,8 @@ export default function Home() {
       const prevCandle = data[i - 2]; // Candle 1
       const midCandle = data[i - 1];   // Candle 2 (tempat FVG ditandai)
       const currCandle = data[i];     // Candle 3
+      let countFVGBull = 0;
+      let countFVGBear = 0;
 
       // Cek Price Gap
       const bullishPriceGap = prevCandle.high < currCandle.low;
@@ -216,17 +219,19 @@ export default function Home() {
       // Hanya tandai jika KEDUA kondisi (Price Gap & Volume) terpenuhi
       if (bullishPriceGap && filterActive) { // diganti dari volumeCondition
         midCandle.fvgBull = { top: currCandle.low, bottom: prevCandle.high };
+        countFVGBull += 1;
       }
 
       if (bearishPriceGap && filterActive) { // diganti dari volumeCondition
         midCandle.fvgBear = { top: prevCandle.low, bottom: currCandle.high };
+        countFVGBear += 1;
       }
     }
     return data;
   };
 
   // 4. Kalkulasi Moving VWAP (MVWAP)
-  const calculateVWAP = (data, period = 12) => {
+  const calculateVWAP = (data, period = 12  ) => {
     // Memastikan data cukup
     if (data.length < period) return data;
 
@@ -467,9 +472,9 @@ export default function Home() {
         if (prevCandle.fvgBull) fvgSignal = 'LONG';
         else if (prevCandle.fvgBear) fvgSignal = 'SHORT';
         
-        //Sinyal VWAP yang dikonfirmasi dengan OBV
-        if (candle.close < candle.vwap && candle.obv > (prevCandle.obv || 0)) vwapSignal = 'LONG';
-        else if (candle.close > candle.vwap && candle.obv < (prevCandle.obv || 0)) vwapSignal = 'SHORT';
+        // Sinyal VWAP dengan konfirmasi OBV (treshold 10% perubahan OBV)
+        if (candle.close > candle.vwap && candle.obv > (prevCandle.obv || 0)) vwapSignal = 'LONG';
+        else if (candle.close < candle.vwap && candle.obv < (prevCandle.obv || 0)) vwapSignal = 'SHORT';
 
         // BARU: Sinyal OBV (Momentum Konfirmasi)
         if (candle.obv > (prevCandle.obv || 0)) obvSignal = 'LONG';
@@ -514,7 +519,7 @@ export default function Home() {
       const latestSignal = formattedData[formattedData.length - 1].signal || 'NEUTRAL'; 
       
       // --- LOGIKA MAIN SUARA ---
-      if (!isMuted && latestSignal && latestSignal !== signal) {
+      if (!isMuted && latestSignal) {
         if (latestSignal === 'LONG') {
           playBeep('long');
         } else if (latestSignal === 'SHORT') {
@@ -552,7 +557,7 @@ export default function Home() {
       const intervalId = setInterval(() => {
         console.log("Auto-refreshing data...");
         runStrategy(coinPair, indicator, timeframe);
-      }, 1 * 60 * 1000); // 1 menit
+      },  30 * 1000); // 3 menit
 
       return () => clearInterval(intervalId);
     }
@@ -751,6 +756,8 @@ export default function Home() {
                     onChange={(e) => setTimeframe(e.target.value)}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
+                    <option value="1m">1m</option>
+                    <option value="3m">3m</option>
                     <option value="5m">5m</option>
                     <option value="15m">15m</option>
                     <option value="1h">1h</option>
