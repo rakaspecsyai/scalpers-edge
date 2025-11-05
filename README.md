@@ -1,12 +1,12 @@
 # Scalper's Edge: Crypto Scalping Signal Dashboard
 
-A futuristic, React-based dashboard prototype designed to identify potential crypto scalping signals. This tool fetches market data from the CoinGecko API and applies common technical indicators to generate simple trading signals.
+A futuristic, React-based dashboard prototype designed to identify potential crypto scalping signals. This tool fetches market data from the AsterDEX API and applies common technical indicators to generate simple trading signals.
 
 This project was built as a high-fidelity prototype to explore strategy visualization and front-end data handling with Next.js.
 
 ## 🚀 Features
 
-"Real-Time-ish" Data: Automatically fetches 1-day market data (1-minute granularity) from the CoinGecko API every 3 minutes.
+"Real-Time-ish" Data: Automatically fetches 1-day market data (1-minute granularity) from the AsterDEX API every 1 minute.
 
 Selectable Strategies: Analyze markets using:
 
@@ -36,7 +36,7 @@ Futuristic UI: A responsive, dark-mode dashboard built with Next.js and Tailwind
 
 - ### Icons: Lucide React
 
-- ### Data Source: CoinGecko Public API
+- ### Data Source: AsterDEX API
 
 ## 💻 Getting Started (Running Locally)
 
